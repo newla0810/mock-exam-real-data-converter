@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>모의고사 실채점 PDF → 엑셀 변환기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#eef1f5;color:#2c3e50;min-height:100vh}
+
+/* Header */
+.hdr{background:linear-gradient(135deg,#2c3e6b 0%,#3a5088 100%);padding:24px 32px;color:#fff}
+.hdr-in{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.logo{width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.hdr h1{font-size:19px;font-weight:700}
+.hdr p{font-size:12px;color:rgba(255,255,255,.7);margin-top:2px}
+
+/* Container */
+.ct{max-width:1100px;margin:0 auto;padding:24px 28px}
+
+/* Cards */
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:800px){.g3{grid-template-columns:1fr}}
+.cd{background:#fff;border:1px solid #dde3ec;border-radius:12px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.lb{font-size:10px;color:#8896a8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;font-weight:600}
+
+/* Grade buttons */
+.gr{display:flex;gap:8px}
+.gb{flex:1;padding:11px 0;border-radius:8px;border:1px solid #dde3ec;cursor:pointer;font-size:15px;font-weight:700;transition:all .2s;background:#f5f7fa;color:#8896a8;font-family:inherit}
+.gb.on{background:linear-gradient(135deg,#3a5088,#4a6aaf);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(58,80,136,.25)}
+
+/* Upload buttons */
+.ub{width:100%;padding:14px;border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s;font-family:inherit;border:2px dashed #cdd5e0;background:#f9fafc;color:#8896a8;text-align:center}
+.ub:hover{border-color:#9aa8bb;background:#f0f3f8}
+.ub.ok{border:2px solid #5cb85c;background:#f0faf0;color:#3a7d3a}
+
+/* Action buttons */
+.ar{display:flex;gap:12px;margin-bottom:18px;align-items:center;flex-wrap:wrap}
+.ab{padding:11px 28px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;font-family:inherit}
+.ab.p{background:linear-gradient(135deg,#3a5088,#4a6aaf);color:#fff;box-shadow:0 3px 10px rgba(58,80,136,.2)}
+.ab.p:hover{box-shadow:0 4px 14px rgba(58,80,136,.35)}
+.ab.s{background:linear-gradient(135deg,#43a047,#66bb6a);color:#fff;box-shadow:0 3px 10px rgba(67,160,71,.2)}
+.ab.s:hover{box-shadow:0 4px 14px rgba(67,160,71,.35)}
+.ab:disabled{background:#d5dbe5!important;color:#a0aab8!important;box-shadow:none!important;cursor:not-allowed}
+
+/* Log panel */
+.lp{background:#fff;border:1px solid #dde3ec;border-radius:10px;padding:14px 16px;margin-bottom:18px;max-height:180px;overflow-y:auto;font-size:11px;font-family:'Courier New',monospace;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.ll{padding:2px 0}.lt{color:#b0b8c8;margin-right:8px}
+.li{color:#7a8a9e}.ls{color:#2e8b57}.lw{color:#d4930d}.le{color:#c0392b}
+
+/* Preview table */
+.pw{background:#fff;border:1px solid #dde3ec;border-radius:12px;overflow:hidden;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.ph{padding:14px 18px;border-bottom:1px solid #e8ecf2;display:flex;justify-content:space-between;align-items:center;background:#f9fafc}
+.ph h3{font-size:14px;font-weight:700;color:#2c3e50}.ph span{font-size:11px;color:#8896a8}
+.ps{overflow-x:auto;max-height:500px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:8px 6px;text-align:center;color:#6b7d95;font-weight:600;font-size:9px;white-space:pre-line;border-bottom:2px solid #e8ecf2;position:sticky;top:0;background:#f5f7fa;z-index:1}
+td{padding:6px 5px;text-align:center;white-space:nowrap;border-bottom:1px solid #f0f2f6;color:#3a4a5c}
+tr:hover td{background:#f7f9fc}
+.c1{background:#e8f5e9;color:#2e7d32}.c3{background:#e3f2fd;color:#1565c0}.c5{background:#fff8e1;color:#f57f17}.c7{background:#fce4ec;color:#c62828}
+
+/* Help box */
+.hb{margin-top:20px;padding:16px 20px;border-radius:10px;background:#fff;border:1px solid #dde3ec;font-size:12px;color:#7a8a9e;line-height:1.8;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.hb strong{color:#3a4a5c}
+.uw{background:#fff;border:1px solid #f0c040;border-radius:12px;overflow:hidden;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.uh{padding:12px 18px;border-bottom:1px solid #f0d870;display:flex;justify-content:space-between;align-items:center;background:#fffbe6}
+.uh h3{font-size:14px;font-weight:700;color:#8a6d00}.uh span{font-size:11px;color:#b8960a}
+.um{padding:12px 18px;font-size:12px;color:#8a6d00;background:#fffef5;border-bottom:1px solid #f5edc0}
+.um strong{color:#6b5300}
+.us{overflow-x:auto;max-height:300px;overflow-y:auto}
+
+/* Footer */
+.ft{text-align:center;padding:18px;font-size:11px;color:#a0aab8}
+
+/* Spinner */
+.sp{display:inline-block;width:16px;height:16px;border:2px solid #3a5088;border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Loading bar */
+.loadbar{background:#fff;border:1px solid #dde3ec;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+</style>
+</head>
+<body>
+<div class="hdr"><div class="hdr-in">
+<div class="logo">📊</div>
+<div><h1>모의고사 실채점 PDF → 엑셀 변환기</h1><p>성적일람표 PDF에서 데이터를 추출하여 가채점 엑셀 파일에 자동 입력합니다</p></div>
+</div></div>
+<div class="ct">
+<div class="loadbar" id="loadbar">
+<div class="sp"></div><span style="color:#5a6e85;font-size:13px">라이브러리 로딩 중...</span></div>
+<div class="g3">
+<div class="cd"><div class="lb">Step 1 — 학년 선택</div>
+<div class="gr"><button class="gb on" onclick="pickGrade(1)">1학년</button><button class="gb" onclick="pickGrade(2)">2학년</button><button class="gb" onclick="pickGrade(3)">3학년</button></div></div>
+<div class="cd"><div class="lb">Step 2 — 가채점 엑셀 파일</div>
+<input type="file" id="xin" accept=".xlsx,.xls" onchange="onXls(event)" hidden>
+<button class="ub" id="xbtn" onclick="document.getElementById('xin').click()">📁 클릭하여 가채점 엑셀 파일 업로드</button></div>
+<div class="cd"><div class="lb">Step 3 — PDF 파일 (복수 선택)</div>
+<input type="file" id="pin" accept=".pdf" multiple onchange="onPdf(event)" hidden>
+<button class="ub" id="pbtn" onclick="document.getElementById('pin').click()">📄 클릭하여 PDF 업로드</button></div>
+</div>
+<div class="ar">
+<button class="ab p" id="bp" onclick="doParse()" disabled>① PDF 파싱</button>
+<button class="ab s" id="ba" onclick="doApply()" disabled>② 엑셀 적용 & 다운로드</button>
+<span id="badges"></span></div>
+<div class="lp" id="logp" style="display:none"></div>
+<div class="uw" id="umw" style="display:none">
+<div class="uh"><h3>⚠️ 미매칭 학생 목록</h3><span id="umc"></span></div>
+<div class="um">아래 학생들은 PDF에 데이터가 없어 엑셀에 반영되지 않았습니다. <strong>직접 확인</strong>이 필요합니다.</div>
+<div class="us" id="ums"></div></div>
+<div class="pw" id="pvw" style="display:none">
+<div class="ph"><h3>📋 파싱 결과 미리보기</h3><span id="pvc"></span></div>
+<div class="ps" id="pvs"></div></div>
+<div class="hb">
+<strong>사용법</strong><br>
+1. 학년 선택 → 2. 엑셀 업로드 → 3. PDF 업로드(복수) → 「PDF 파싱」 → 미리보기 확인 → 「엑셀 적용 & 다운로드」<br><br>
+<strong>3학년 파싱:</strong> "화법과 작문", "미적분" 등 알려진 선택과목명을 앵커로 사용 (좌표 무관)<br>
+<strong>기록 항목:</strong> 선택과목, 표준점수, 백분위, 등급 (영어·한국사는 등급만)<br>
+<strong>매칭 기준:</strong> 엑셀 반(C열)+번호(D열) ↔ PDF 반+번호<br>
+<strong>과목명 변환:</strong> 생명과학I→생명과학1, 사회·문화→사회문화
+</div>
+<div class="ft">보문고등학교 교육연구부 · 모의고사 실채점 PDF→엑셀 변환기</div>
+</div>
+<script>
+var grade=1,xlsFile=null,xlsData=null,pdfFiles=[],parsed=[],libOk=false;
+var KOR_SUBS=['화법과작문','언어와매체'];
+var MATH_SUBS=['확률과통계','미적분','기하'];
+var XMAP={'국어_선택':6,'국어_표준':8,'국어_백분위':9,'국어_등급':10,
+'수학_선택':11,'수학_표준':13,'수학_백분위':14,'수학_등급':15,
+'영어_등급':17,'한국사_등급':19,
+'탐구1_과목':20,'탐구1_표준':22,'탐구1_백분위':23,'탐구1_등급':24,
+'탐구2_과목':25,'탐구2_표준':27,'탐구2_백분위':28,'탐구2_등급':29};
+var PCOLS=['번호','이름','국어_선택','국어_표준','국어_백분위','국어_등급',
+'수학_선택','수학_표준','수학_백분위','수학_등급','영어_등급','한국사_등급',
+'탐구1_과목','탐구1_표준','탐구1_백분위','탐구1_등급',
+'탐구2_과목','탐구2_표준','탐구2_백분위','탐구2_등급'];
+var F12=[['번호','n'],['이름','t'],
+['국어_선택','t'],['국어_표준','n'],['국어_석차','n'],['국어_백분위','n'],['국어_등급','n'],
+['수학_선택','t'],['수학_표준','n'],['수학_석차','n'],['수학_백분위','n'],['수학_등급','n'],
+['영어_등급','n'],['한국사_등급','n'],
+['탐구1_과목','t'],['탐구1_표준','n'],['탐구1_석차','n'],['탐구1_백분위','n'],['탐구1_등급','n'],
+['탐구2_과목','t'],['탐구2_표준','n'],['탐구2_석차','n'],['탐구2_백분위','n'],['탐구2_등급','n']];
+
+window.addEventListener('DOMContentLoaded',function(){pickGrade(1);chkLib()});
+function chkLib(){if(window.pdfjsLib&&window.XLSX){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  libOk=true;document.getElementById('loadbar').style.display='none';upd()}else setTimeout(chkLib,200)}
+
+function pickGrade(g){grade=g;parsed=[];document.getElementById('pvw').style.display='none';
+  document.getElementById('umw').style.display='none';
+  document.getElementById('badges').innerHTML='';
+  document.querySelectorAll('.gb').forEach(function(b,i){b.classList.toggle('on',i+1===g)});upd()}
+function onXls(e){var f=e.target.files[0];if(!f)return;xlsFile=f;
+  var r=new FileReader();r.onload=function(ev){xlsData=new Uint8Array(ev.target.result);
+  var b=document.getElementById('xbtn');b.textContent='✅ '+f.name;b.classList.add('ok');
+  log('엑셀 로드: '+f.name,'s');upd()};r.readAsArrayBuffer(f)}
+function onPdf(e){pdfFiles=Array.from(e.target.files);
+  var b=document.getElementById('pbtn');b.textContent='✅ '+pdfFiles.length+'개 PDF 선택됨';b.classList.add('ok');
+  log('PDF '+pdfFiles.length+'개 선택','i');upd()}
+function upd(){document.getElementById('bp').disabled=!libOk||!pdfFiles.length;
+  document.getElementById('ba').disabled=!parsed.length||!xlsData}
+function log(m,t){var p=document.getElementById('logp');p.style.display='block';
+  var c=t==='s'?'ls':t==='w'?'lw':t==='e'?'le':'li';
+  p.innerHTML+='<div class="ll"><span class="lt">'+new Date().toLocaleTimeString()+'</span><span class="'+c+'">'+m+'</span></div>';
+  p.scrollTop=p.scrollHeight}
+
+function norm(s){if(!s)return s;var n=s.trim();
+  n=n.replace(/II$/g,'2').replace(/Ⅱ$/g,'2');
+  n=n.replace(/I$/g,'1').replace(/Ⅰ$/g,'1');
+  n=n.replace(/·/g,'').replace(/\s+/g,'');return n}
+
+function isD(c){return/[\d.]/.test(c)}
+function groupRows(items){
+  var m={},tol=3;
+  for(var i=0;i<items.length;i++){var it=items[i];if(!it.str||!it.str.trim())continue;
+    var y=Math.round(it.transform[5]/tol)*tol;if(!m[y])m[y]=[];
+    m[y].push({x:it.transform[4],str:it.str})}
+  return Object.keys(m).map(function(y){return{y:+y,ch:m[y].sort(function(a,b){return a.x-b.x})}})
+    .sort(function(a,b){return b.y-a.y})}
+function getClass(rows,g){
+  for(var i=0;i<rows.length;i++){
+    var full=rows[i].ch.map(function(c){return c.str}).join('');
+    if(full.indexOf('고등학교')<0)continue;
+    // 전략1: 작은 임계값으로 학년/반 분리
+    var tk=simpleTok(rows[i].ch,10);
+    for(var j=0;j<tk.length-1;j++){
+      if(tk[j]===String(g)&&/^\d{1,2}$/.test(tk[j+1]))return parseInt(tk[j+1])}
+    // 전략2: 합쳐진 경우 (예: "310" → 3학년 10반)
+    for(var j=0;j<tk.length;j++){
+      if(tk[j].length>=2&&tk[j][0]===String(g)){
+        var rest=tk[j].substring(1);
+        if(/^\d{1,2}$/.test(rest))return parseInt(rest)}}
+  }return null}
+function simpleTok(ch,th){if(!ch.length)return[];var t=[],c=ch[0].str;
+  for(var i=1;i<ch.length;i++){if(ch[i].x-ch[i-1].x<th)c+=ch[i].str;else{t.push(c.trim());c=ch[i].str}}
+  t.push(c.trim());return t.filter(Boolean)}
+
+function smartTok(chars){
+  var sorted=chars.slice().sort(function(a,b){return a.x-b.x});
+  if(!sorted.length)return[];
+  var dGaps=[],tGaps=[];
+  for(var i=1;i<sorted.length;i++){
+    var d=sorted[i].x-sorted[i-1].x;if(d<=0)continue;
+    var pD=isD(sorted[i-1].str.slice(-1)),cD=isD(sorted[i].str[0]);
+    if(pD&&cD)dGaps.push(d);if(!pD&&!cD)tGaps.push(d)}
+  dGaps.sort(function(a,b){return a-b});tGaps.sort(function(a,b){return a-b});
+  var medD=dGaps.length?dGaps[Math.floor(dGaps.length/2)]:999;
+  var medT=tGaps.length>=3?tGaps[Math.floor(tGaps.length/2)]:medD;
+  var dTh=medD*2.5,tTh=medT*2.5;
+  var tokens=[],cur=sorted[0].str;
+  for(var i=1;i<sorted.length;i++){
+    var dist=sorted[i].x-sorted[i-1].x;
+    var pC=sorted[i-1].str.slice(-1),nC=sorted[i].str[0];
+    var pDD=isD(pC),nDD=isD(nC),split=false;
+    if(pDD!==nDD)split=true;
+    else if(pDD)split=dist>dTh;
+    else split=dist>tTh;
+    if(split){tokens.push(cur.trim());cur=sorted[i].str}else cur+=sorted[i].str}
+  if(cur.trim())tokens.push(cur.trim());
+  return tokens.filter(Boolean)}
+
+function parse3(rows){
+  var students=[];
+  for(var ri=0;ri<rows.length;ri++){
+    var tokens=smartTok(rows[ri].ch).filter(function(t){return!/^-+$/.test(t)});
+    if(tokens.length<10)continue;
+    if(!/^\d{1,2}$/.test(tokens[0]))continue;
+    if(tokens.length>1&&/^[\d.]+$/.test(tokens[1]))continue;
+    var skip=false;for(var j=0;j<tokens.length;j++){if(/평균|학급|학교|전국/.test(tokens[j])){skip=true;break}}
+    if(skip)continue;
+    var kIdx=-1;
+    for(var i=2;i<Math.min(tokens.length,8);i++){
+      var n=tokens[i].replace(/\s/g,'');
+      for(var k=0;k<KOR_SUBS.length;k++){if(n===KOR_SUBS[k]){kIdx=i;break}}if(kIdx>=0)break}
+    if(kIdx<0)continue;
+    var mIdx=-1;
+    for(var i=kIdx+2;i<Math.min(tokens.length,kIdx+8);i++){
+      var n=tokens[i].replace(/\s/g,'');
+      for(var k=0;k<MATH_SUBS.length;k++){if(n===MATH_SUBS[k]){mIdx=i;break}}if(mIdx>=0)break}
+    if(mIdx<0)continue;
+    var s={};
+    s['번호']=tokens[0];
+    s['이름']=tokens.slice(1,kIdx).join('');
+    s['국어_선택']=norm(tokens[kIdx]);
+    var kN=[];for(var i=kIdx+1;i<mIdx;i++){if(/^[\d.]+$/.test(tokens[i]))kN.push(tokens[i])}
+    s['국어_표준']=kN[0]||'';s['국어_석차']=kN[1]||'';s['국어_백분위']=kN[2]||'';s['국어_등급']=kN[3]||'';
+    s['수학_선택']=norm(tokens[mIdx]);
+    var idx=mIdx+1;
+    var mN=[];while(idx<tokens.length&&mN.length<4){if(/^[\d.]+$/.test(tokens[idx]))mN.push(tokens[idx++]);else break}
+    s['수학_표준']=mN[0]||'';s['수학_석차']=mN[1]||'';s['수학_백분위']=mN[2]||'';s['수학_등급']=mN[3]||'';
+    var ehn=[];while(idx<tokens.length&&ehn.length<2){if(/^[\d.]+$/.test(tokens[idx]))ehn.push(tokens[idx++]);else break}
+    s['영어_등급']=ehn[0]||'';s['한국사_등급']=ehn[1]||'';
+    var t1='';while(idx<tokens.length&&!/^[\d.]+$/.test(tokens[idx])){t1+=tokens[idx++]}
+    s['탐구1_과목']=norm(t1);
+    var t1n=[];while(idx<tokens.length&&t1n.length<4){if(/^[\d.]+$/.test(tokens[idx]))t1n.push(tokens[idx++]);else break}
+    s['탐구1_표준']=t1n[0]||'';s['탐구1_석차']=t1n[1]||'';s['탐구1_백분위']=t1n[2]||'';s['탐구1_등급']=t1n[3]||'';
+    var t2='';while(idx<tokens.length&&!/^[\d.]+$/.test(tokens[idx])){t2+=tokens[idx++]}
+    s['탐구2_과목']=norm(t2);
+    var t2n=[];while(idx<tokens.length&&t2n.length<4){if(/^[\d.]+$/.test(tokens[idx]))t2n.push(tokens[idx++]);else break}
+    s['탐구2_표준']=t2n[0]||'';s['탐구2_석차']=t2n[1]||'';s['탐구2_백분위']=t2n[2]||'';s['탐구2_등급']=t2n[3]||'';
+    students.push(s)}
+  return students}
+
+function parse12(rows){
+  var students=[];
+  for(var ri=0;ri<rows.length;ri++){
+    var tokens=smartTok(rows[ri].ch).filter(function(t){return!/^-+$/.test(t)});
+    if(tokens.length<8)continue;
+    if(!/^\d{1,2}$/.test(tokens[0]))continue;
+    if(tokens.length>1&&/^[\d.]+$/.test(tokens[1]))continue;
+    var skip=false;for(var j=0;j<tokens.length;j++){if(/평균/.test(tokens[j])){skip=true;break}}if(skip)continue;
+    var s={},ti=0;
+    for(var fi=0;fi<F12.length;fi++){var fn=F12[fi][0],ft=F12[fi][1];
+      if(ti>=tokens.length)break;var tok=tokens[ti];
+      if(ft==='n'){if(/^[\d.,-]+$/.test(tok)){s[fn]=tok;ti++}else s[fn]=''}
+      else{if(!/^[\d.,-]+$/.test(tok)){s[fn]=tok;ti++}else s[fn]=''}}
+    if(s['번호']&&/^\d+$/.test(s['번호'])){
+      var ks=['국어_선택','수학_선택','탐구1_과목','탐구2_과목'];
+      for(var ki=0;ki<ks.length;ki++){if(s[ks[ki]])s[ks[ki]]=norm(s[ks[ki]])}
+      students.push(s)}}
+  return students}
+
+async function parsePdf(file){
+  var ab=await file.arrayBuffer();
+  var pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  var pg=await pdf.getPage(1);
+  var tc=await pg.getTextContent();
+  var rows=groupRows(tc.items);
+  var cn=getClass(rows,grade);
+  var stu=grade===3?parse3(rows):parse12(rows);
+  return{classNum:cn,students:stu,fn:file.name}}
+
+async function doParse(){
+  if(!pdfFiles.length)return;
+  document.getElementById('logp').innerHTML='';parsed=[];document.getElementById('badges').innerHTML='';
+  for(var fi=0;fi<pdfFiles.length;fi++){var f=pdfFiles[fi];
+    try{log('파싱 중: '+f.name+'...','i');
+      var r=await parsePdf(f);parsed.push(r);
+      if(r.classNum!==null)log('✓ '+f.name+' → '+r.classNum+'반, '+r.students.length+'명','s');
+      else log('⚠ '+f.name+' → 반 번호 미확인','w');
+    }catch(e){log('✗ '+f.name+' 실패: '+e.message,'e')}}
+  var tot=parsed.reduce(function(s,r){return s+r.students.length},0);
+  log('총 '+tot+'명 추출 완료','s');renderPV();upd()}
+
+function gc(v){var g=parseInt(v);return g<=2?'c1':g<=4?'c3':g<=6?'c5':'c7'}
+function renderPV(){
+  var tot=parsed.reduce(function(s,r){return s+r.students.length},0);
+  if(!tot){document.getElementById('pvw').style.display='none';return}
+  document.getElementById('pvw').style.display='block';
+  document.getElementById('pvc').textContent='총 '+tot+'명';
+  var h='<table><thead><tr><th>반</th>';
+  for(var i=0;i<PCOLS.length;i++)h+='<th>'+PCOLS[i].replace('_','\n')+'</th>';
+  h+='</tr></thead><tbody>';
+  for(var ri=0;ri<parsed.length;ri++){var r=parsed[ri];
+    for(var si=0;si<r.students.length;si++){var s=r.students[si];
+      h+='<tr><td>'+(r.classNum!=null?r.classNum:'?')+'</td>';
+      for(var ci=0;ci<PCOLS.length;ci++){var c=PCOLS[ci],v=s[c]||'-';
+        var cls=c.indexOf('등급')>=0&&v!=='-'?gc(v):'';
+        h+='<td class="'+cls+'">'+v+'</td>'}h+='</tr>'}}
+  h+='</tbody></table>';document.getElementById('pvs').innerHTML=h}
+
+function doApply(){
+  if(!xlsData||!parsed.length)return;
+  try{var wb=XLSX.read(xlsData,{type:'array',cellFormula:false});
+    var ws=wb.Sheets['성적데이터'];if(!ws)throw new Error('성적데이터 시트 없음');
+    var rng=XLSX.utils.decode_range(ws['!ref']);
+    var lk={};
+    for(var pi=0;pi<parsed.length;pi++){var p=parsed[pi];if(p.classNum===null)continue;
+      for(var si=0;si<p.students.length;si++){var st=p.students[si];
+        lk[p.classNum+'-'+parseInt(st['번호'])]=st}}
+    var ok=0,no=0,missed=[];
+    for(var r=2;r<=rng.e.r;r++){
+      var cc=ws[XLSX.utils.encode_cell({r:r,c:2})],nc=ws[XLSX.utils.encode_cell({r:r,c:3})];
+      if(!cc||!nc)continue;
+      var cv=typeof cc.v==='number'?cc.v:parseInt(cc.v);
+      var nv=typeof nc.v==='number'?nc.v:parseInt(nc.v);
+      if(isNaN(cv)||isNaN(nv))continue;
+      var st=lk[cv+'-'+nv];
+      if(!st){
+        var nm=ws[XLSX.utils.encode_cell({r:r,c:4})];
+        missed.push({ban:cv,bun:nv,name:nm?nm.v:''});
+        no++;continue}
+      var keys=Object.keys(XMAP);
+      for(var ki=0;ki<keys.length;ki++){var fn=keys[ki],col=XMAP[fn];
+        var ref=XLSX.utils.encode_cell({r:r,c:col-1}),v=st[fn];
+        if(v!==undefined&&v!==''&&v!=='-'){
+          if(/^[\d.,-]+$/.test(v)){var num=parseFloat(v);if(!isNaN(num)){ws[ref]={t:'n',v:num}}else{delete ws[ref]}}
+          else{ws[ref]={t:'s',v:v}}
+        }else{delete ws[ref]}}
+      ok++}
+    // 미매칭 테이블 표시
+    renderMissed(missed);
+    var out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    var bl=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var u=URL.createObjectURL(bl);var a=document.createElement('a');
+    a.href=u;a.download=xlsFile.name.replace('.xlsx','_모의고사반영.xlsx');a.click();URL.revokeObjectURL(u);
+    log('✓ '+ok+'명 적용, '+no+'명 미매칭','s');
+    document.getElementById('badges').innerHTML='<span style="color:#2e8b57;font-size:12px;margin-left:8px">✅ '+ok+'명 적용</span>'+
+      (no>0?'<span style="color:#d4930d;font-size:12px;margin-left:8px">⚠ '+no+'명 미매칭</span>':'');
+  }catch(e){log('✗ 실패: '+e.message,'e')}}
+
+function renderMissed(list){
+  var w=document.getElementById('umw');
+  if(!list.length){w.style.display='none';return}
+  w.style.display='block';
+  document.getElementById('umc').textContent=list.length+'명';
+  var h='<table><thead><tr><th>반</th><th>번호</th><th>이름</th></tr></thead><tbody>';
+  for(var i=0;i<list.length;i++){
+    h+='<tr><td>'+list[i].ban+'</td><td>'+list[i].bun+'</td><td>'+list[i].name+'</td></tr>'}
+  h+='</tbody></table>';
+  document.getElementById('ums').innerHTML=h}
+</script>
+</body></html>
