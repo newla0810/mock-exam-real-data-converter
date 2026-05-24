@@ -29,7 +29,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#eef1f5;color
 
 /* Grade buttons */
 .gr{display:flex;gap:8px}
-.gb{flex:1;padding:11px 0;border-radius:8px;border:1px solid #dde3ec;cursor:pointer;font-size:15px;font-weight:700;transition:all .2s;background:#f5f7fa;color:#8896a8;font-family:inherit}
+.gb{flex:1;padding:11px 4px;border-radius:8px;border:1px solid #dde3ec;cursor:pointer;font-size:13px;font-weight:700;transition:all .2s;background:#f5f7fa;color:#8896a8;font-family:inherit;white-space:nowrap}
 .gb.on{background:linear-gradient(135deg,#3a5088,#4a6aaf);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(58,80,136,.25)}
 
 /* Upload buttons */
@@ -93,11 +93,11 @@ tr:hover td{background:#f7f9fc}
 <div class="sp"></div><span style="color:#5a6e85;font-size:13px">라이브러리 로딩 중...</span></div>
 <div class="g3">
 <div class="cd"><div class="lb">Step 1 — 학년 선택</div>
-<div class="gr"><button class="gb on" onclick="pickGrade(1)">1학년</button><button class="gb" onclick="pickGrade(2)">2학년</button><button class="gb" onclick="pickGrade(3)">3학년</button></div></div>
+<div class="gr"><button class="gb on" onclick="pickGrade(1)">1학년</button><button class="gb" onclick="pickGrade(2)">2학년</button><button class="gb" onclick="pickGrade(3)">3학년</button><button class="gb" onclick="pickGrade('pyeong')">3학년 평가원</button></div></div>
 <div class="cd"><div class="lb">Step 2 — 가채점 엑셀 파일</div>
 <input type="file" id="xin" accept=".xlsx,.xls" onchange="onXls(event)" hidden>
 <button class="ub" id="xbtn" onclick="document.getElementById('xin').click()">📁 클릭하여 가채점 엑셀 파일 업로드</button></div>
-<div class="cd"><div class="lb">Step 3 — PDF 파일 (해당 회차의 '모든' 일람표를 선택)</div>
+<div class="cd"><div class="lb">Step 3 — PDF 파일 (복수 선택)</div>
 <input type="file" id="pin" accept=".pdf" multiple onchange="onPdf(event)" hidden>
 <button class="ub" id="pbtn" onclick="document.getElementById('pin').click()">📄 클릭하여 PDF 업로드</button></div>
 </div>
@@ -117,6 +117,7 @@ tr:hover td{background:#f7f9fc}
 <strong>사용법</strong><br>
 1. 학년 선택 → 2. 엑셀 업로드 → 3. PDF 업로드(복수) → 「PDF 파싱」 → 미리보기 확인 → 「엑셀 적용 & 다운로드」<br><br>
 <strong>3학년 파싱:</strong> "화법과 작문", "미적분" 등 알려진 선택과목명을 앵커로 사용 (좌표 무관)<br>
+<strong>3학년 평가원 파싱:</strong> 컬럼 x좌표 기반 매핑, 수험번호 끝 4자리에서 반·번호 자동 추출<br>
 <strong>기록 항목:</strong> 선택과목, 표준점수, 백분위, 등급 (영어·한국사는 등급만)<br>
 <strong>매칭 기준:</strong> 엑셀 반(C열)+번호(D열) ↔ PDF 반+번호<br>
 <strong>과목명 변환:</strong> 생명과학I→생명과학1, 사회·문화→사회문화
@@ -151,7 +152,8 @@ function chkLib(){if(window.pdfjsLib&&window.XLSX){
 function pickGrade(g){grade=g;parsed=[];document.getElementById('pvw').style.display='none';
   document.getElementById('umw').style.display='none';
   document.getElementById('badges').innerHTML='';
-  document.querySelectorAll('.gb').forEach(function(b,i){b.classList.toggle('on',i+1===g)});upd()}
+  var gv=[1,2,3,'pyeong'];
+  document.querySelectorAll('.gb').forEach(function(b,i){b.classList.toggle('on',gv[i]===g)});upd()}
 function onXls(e){var f=e.target.files[0];if(!f)return;xlsFile=f;
   var r=new FileReader();r.onload=function(ev){xlsData=new Uint8Array(ev.target.result);
   var b=document.getElementById('xbtn');b.textContent='✅ '+f.name;b.classList.add('ok');
@@ -282,9 +284,67 @@ function parse12(rows){
       students.push(s)}}
   return students}
 
+// === 평가원 PDF 파서 ===
+// 컬럼 x좌표 경계: 한국사 | 국어 | 수학 | 영어 | 탐구1 | 탐구2 | 제2외
+var COLS_PY=[[165,200],[200,252],[252,308],[308,355],[355,425],[425,495],[495,600]];
+function parsePyeong(rows){
+  var students=[];
+  for(var ri=0;ri<rows.length;ri++){
+    var ch=rows[ri].ch;
+    // 라벨 영역 (x<165)
+    var lbl=ch.filter(function(c){return c.x<165}).sort(function(a,b){return a.x-b.x})
+              .map(function(c){return c.str}).join('').replace(/\s+/g,'');
+    // 컬럼별 텍스트
+    var cols=[];
+    for(var ci=0;ci<COLS_PY.length;ci++){
+      var xa=COLS_PY[ci][0],xb=COLS_PY[ci][1];
+      var txt=ch.filter(function(c){return c.x>=xa&&c.x<xb}).sort(function(a,b){return a.x-b.x})
+                .map(function(c){return c.str}).join('').trim();
+      cols.push(txt)}
+    // 라벨로 분류
+    if(lbl.indexOf('선택과목')>=0){students.push({_sub:cols})}
+    else if(students.length&&lbl.indexOf('표준점수')>=0){students[students.length-1]._std=cols}
+    else if(students.length&&lbl.indexOf('백분위')>=0){students[students.length-1]._pct=cols}
+    else if(students.length&&lbl.indexOf('등급')>=0){students[students.length-1]._grd=cols}
+    // 수험번호·이름 (x<100)
+    var left=ch.filter(function(c){return c.x<100}).sort(function(a,b){return a.x-b.x})
+               .map(function(c){return c.str}).join('');
+    var cm=left.match(/\d{9}/);
+    if(cm&&students.length&&!students[students.length-1]._code)students[students.length-1]._code=cm[0];
+    var nm=left.match(/[가-힣]{2,5}/);
+    if(nm&&students.length&&!students[students.length-1]._name)students[students.length-1]._name=nm[0];
+  }
+  // XMAP 키로 변환
+  function cv(v){if(!v||v==='-')return '';return v.replace(/^-+|-+$/g,'')}
+  var result=[];
+  for(var i=0;i<students.length;i++){var s=students[i];
+    if(!s._code||!s._sub)continue;
+    var sub=s._sub,std=s._std||[],pct=s._pct||[],grd=s._grd||[];
+    result.push({
+      '번호':parseInt(s._code.slice(-2)),
+      '이름':s._name||'',
+      '_ban':parseInt(s._code.slice(-4,-2)),
+      '국어_선택':norm(sub[1]||''),'국어_표준':cv(std[1]),'국어_백분위':cv(pct[1]),'국어_등급':cv(grd[1]),
+      '수학_선택':norm(sub[2]||''),'수학_표준':cv(std[2]),'수학_백분위':cv(pct[2]),'수학_등급':cv(grd[2]),
+      '영어_등급':cv(grd[3]),'한국사_등급':cv(grd[0]),
+      '탐구1_과목':norm(sub[4]||''),'탐구1_표준':cv(std[4]),'탐구1_백분위':cv(pct[4]),'탐구1_등급':cv(grd[4]),
+      '탐구2_과목':norm(sub[5]||''),'탐구2_표준':cv(std[5]),'탐구2_백분위':cv(pct[5]),'탐구2_등급':cv(grd[5])
+    })}
+  return result}
+
 async function parsePdf(file){
   var ab=await file.arrayBuffer();
   var pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  if(grade==='pyeong'){
+    // 평가원: 모든 페이지에서 학생 추출, 반은 수험번호에서
+    var all=[];
+    for(var pi=1;pi<=pdf.numPages;pi++){
+      var pg=await pdf.getPage(pi);
+      var tc=await pg.getTextContent();
+      var rows=groupRows(tc.items);
+      all=all.concat(parsePyeong(rows))}
+    var cn=all.length?all[0]._ban:null;
+    return{classNum:cn,students:all,fn:file.name}}
   var pg=await pdf.getPage(1);
   var tc=await pg.getTextContent();
   var rows=groupRows(tc.items);
